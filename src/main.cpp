@@ -6,14 +6,17 @@
 
 #include <print>
 #include <vector>
+#include <numbers>
 
 #include "UI/SinController.h"
 
 SinParam sin1 = {10, 10, 0};
-SinParam sin2 = {15, 20, 0};
+SinParam sin2 = {0, 0, 0};
 SinParam sin3 = {0, 0, 0};
 
-float freq = 1'00;
+int freq = 1'00;
+
+int data_count = freq * 1;
 
 static void glfw_error_callback(int error, const char* description)
 {
@@ -22,16 +25,16 @@ static void glfw_error_callback(int error, const char* description)
 
 void FillSinData(std::vector<double>& x_data, std::vector<double>& y_data)
 {
-    float time_step = 1 / freq;
+    float time_step = 1.0f / freq;
     x_data.clear();
     y_data.clear();
-    x_data.reserve(1000);
-    y_data.reserve(1000);
-    for (int i = 0; i < (int)freq; i++)
+    x_data.reserve(data_count);
+    y_data.reserve(data_count);
+    for (int i = 0; i < data_count; i++)
     {
-        double sin1_data = sin1.amplitude * sin(sin1.frequency * time_step * i + sin1.phase);
-        double sin2_data = sin2.amplitude * sin(sin2.frequency * time_step * i + sin2.phase);
-        double sin3_data = sin3.amplitude * sin(sin3.frequency * time_step * i + sin3.phase);
+        double sin1_data = sin1.amplitude * sin(2 * std::numbers::pi * sin1.frequency * time_step * i + sin1.phase);
+        double sin2_data = sin2.amplitude * sin(2 * std::numbers::pi * sin2.frequency * time_step * i + sin2.phase);
+        double sin3_data = sin3.amplitude * sin(2 * std::numbers::pi * sin3.frequency * time_step * i + sin3.phase);
 
         x_data.push_back(time_step * i);
         y_data.push_back(sin1_data + sin2_data + sin3_data);
@@ -50,7 +53,7 @@ void RenderPlot(const char* title, const char* x_lable, const char* y_lable, con
         if (ImPlot::BeginPlot(title, x_lable, y_lable, ImGui::GetContentRegionAvail(),
             plotFlags, axisFlags, axisFlags))
         {
-            ImPlot::PlotLine(title, x_data, y_data, freq);
+            ImPlot::PlotLine(title, x_data, y_data, data_count);
             ImPlot::EndPlot();
         }
     }
@@ -121,7 +124,7 @@ int main(int, char**)
                 ImGui::Separator();
 
                 ImGui::Text("Other params");
-                is_changed |= ImGui::SliderFloat("Sampling rate", &freq, 1, 1000, "%.0f");
+                is_changed |= ImGui::SliderInt("Sample rate", &freq, 1, 1000);
             }
             ImGui::End();
             
