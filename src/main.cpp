@@ -14,9 +14,9 @@ SinParam sin1 = {10, 10, 0};
 SinParam sin2 = {0, 0, 0};
 SinParam sin3 = {0, 0, 0};
 
-int freq = 1'00;
+int freq = 1'000;
 
-int data_count = freq * 1;
+int data_count = freq;
 
 static void glfw_error_callback(int error, const char* description)
 {
@@ -124,7 +124,8 @@ int main(int, char**)
                 ImGui::Separator();
 
                 ImGui::Text("Other params");
-                is_changed |= ImGui::SliderInt("Sample rate", &freq, 1, 1000);
+                is_changed |= ImGui::InputInt("Sample rate", &freq, 100);
+                is_changed |= ImGui::InputInt("Count of points", &data_count, 100);
             }
             ImGui::End();
             
