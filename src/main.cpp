@@ -6,17 +6,17 @@
 
 #include <print>
 #include <vector>
-#include <numbers>
 
 #include "UI/SinController.h"
+#include "fft.h"
 
 SinParam sin1 = {10, 10, 0};
-SinParam sin2 = {0, 0, 0};
-SinParam sin3 = {0, 0, 0};
+SinParam sin2 = {30, 20, 0};
+SinParam sin3 = {60, 30, 0};
 
-int freq = 1'000;
+int FS = 1'024;
 
-int data_count = freq;
+int data_count = 1024;
 
 static void glfw_error_callback(int error, const char* description)
 {
@@ -25,23 +25,39 @@ static void glfw_error_callback(int error, const char* description)
 
 void FillSinData(std::vector<double>& x_data, std::vector<double>& y_data)
 {
-    float time_step = 1.0f / freq;
+    float time_step = 1.0f / FS;
     x_data.clear();
     y_data.clear();
     x_data.reserve(data_count);
     y_data.reserve(data_count);
     for (int i = 0; i < data_count; i++)
     {
-        double sin1_data = sin1.amplitude * sin(2 * std::numbers::pi * sin1.frequency * time_step * i + sin1.phase);
-        double sin2_data = sin2.amplitude * sin(2 * std::numbers::pi * sin2.frequency * time_step * i + sin2.phase);
-        double sin3_data = sin3.amplitude * sin(2 * std::numbers::pi * sin3.frequency * time_step * i + sin3.phase);
+        double sin1_data = sin1.amplitude * sin(2 * PI * sin1.frequency * time_step * i + sin1.phase);
+        double sin2_data = sin2.amplitude * sin(2 * PI * sin2.frequency * time_step * i + sin2.phase);
+        double sin3_data = sin3.amplitude * sin(2 * PI * sin3.frequency * time_step * i + sin3.phase);
 
         x_data.push_back(time_step * i);
         y_data.push_back(sin1_data + sin2_data + sin3_data);
     }
 }
 
-void RenderPlot(const char* title, const char* x_lable, const char* y_lable, const double* x_data, const double* y_data)
+void CalculateSpectrum(const std::vector<double>& signal, std::vector<double>& ampls, std::vector<double>& freqs)
+{
+    auto N = signal.size();
+
+    auto fft_res = fft_real(signal);
+    ampls = amplitude_spectrum(fft_res);
+    
+    freqs.resize(N / 2);
+    ampls.resize(N / 2);
+    for (int k = 0; k < N / 2; k++)
+    {
+        freqs[k] = static_cast<float>(k * FS) / N;
+    }
+
+}
+
+void RenderPlot(const char* title, const char* x_lable, const char* y_lable, const double* x_data, const double* y_data, int count = data_count)
 {
     if (ImGui::Begin(title, nullptr,
         ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
@@ -53,7 +69,7 @@ void RenderPlot(const char* title, const char* x_lable, const char* y_lable, con
         if (ImPlot::BeginPlot(title, x_lable, y_lable, ImGui::GetContentRegionAvail(),
             plotFlags, axisFlags, axisFlags))
         {
-            ImPlot::PlotLine(title, x_data, y_data, data_count);
+            ImPlot::PlotLine(title, x_data, y_data, count);
             ImPlot::EndPlot();
         }
     }
@@ -92,8 +108,9 @@ int main(int, char**)
     /*================================================*/
     ImVec4 clear_color = ImVec4(0.02f, 0.02f, 0.03f, 1.0f);
 
-    std::vector<double> x_data, y_data;
+    std::vector<double> x_data, y_data, ampls, freqs;
     FillSinData(x_data, y_data);
+    CalculateSpectrum(y_data, ampls, freqs);
     while (!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
@@ -124,16 +141,24 @@ int main(int, char**)
                 ImGui::Separator();
 
                 ImGui::Text("Other params");
-                is_changed |= ImGui::InputInt("Sample rate", &freq, 100);
+                is_changed |= ImGui::InputInt("Sample rate", &FS, 100);
                 is_changed |= ImGui::InputInt("Count of points", &data_count, 100);
             }
             ImGui::End();
             
-            if (is_changed) FillSinData(x_data, y_data);
+            if (is_changed)
+            {
+                FillSinData(x_data, y_data);
+                CalculateSpectrum(y_data, ampls, freqs);
+            }
 
             ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + 400, viewport->WorkPos.y));
             ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x - 400, viewport->WorkSize.y / 3));
             RenderPlot("Input signal", "t, sec", "x", x_data.data(), y_data.data());
+
+            ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + 400, viewport->WorkPos.y + 0.33 * viewport->WorkSize.y));
+            ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x - 400, viewport->WorkSize.y / 3));
+            RenderPlot("Spectrum signal", "f, Hz", "Ampl", freqs.data(), ampls.data(), freqs.size());
         }
 
         // Rendering

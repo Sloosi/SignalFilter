@@ -43,6 +43,7 @@ target_link_libraries(implot PUBLIC imgui)
 
 set(SRC_FILES
     src/main.cpp
+    src/fft.h
     src/UI/SinController.h
     src/UI/SinController.cpp
 )
