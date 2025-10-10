@@ -11,12 +11,23 @@
 #include "fft.h"
 
 SinParam sin1 = {10, 10, 0};
-SinParam sin2 = {30, 20, 0};
-SinParam sin3 = {60, 30, 0};
+SinParam sin2 = {0, 0, 0};
+SinParam sin3 = {0, 0, 0};
 
 int FS = 1'024;
 
 int data_count = 1024;
+float mult = 1.0f;
+
+double CreateWhiteNoise()
+{
+    int i = 0;
+    for (size_t s = 0; s < 12; s++)
+    {
+        i += rand();
+    }
+    return (i - static_cast<double>(RAND_MAX / 2)) / RAND_MAX;
+}
 
 static void glfw_error_callback(int error, const char* description)
 {
@@ -37,7 +48,7 @@ void FillSinData(std::vector<double>& x_data, std::vector<double>& y_data)
         double sin3_data = sin3.amplitude * sin(2 * PI * sin3.frequency * time_step * i + sin3.phase);
 
         x_data.push_back(time_step * i);
-        y_data.push_back(sin1_data + sin2_data + sin3_data);
+        y_data.push_back(sin1_data + sin2_data + sin3_data + mult * CreateWhiteNoise());
     }
 }
 
@@ -48,9 +59,9 @@ void CalculateSpectrum(const std::vector<double>& signal, std::vector<double>& a
     auto fft_res = fft_real(signal);
     ampls = amplitude_spectrum(fft_res);
     
-    freqs.resize(N / 2);
-    ampls.resize(N / 2);
-    for (int k = 0; k < N / 2; k++)
+    freqs.resize(N);
+    ampls.resize(N);
+    for (int k = 0; k < N; k++)
     {
         freqs[k] = static_cast<float>(k * FS) / N;
     }
@@ -143,6 +154,7 @@ int main(int, char**)
                 ImGui::Text("Other params");
                 is_changed |= ImGui::InputInt("Sample rate", &FS, 100);
                 is_changed |= ImGui::InputInt("Count of points", &data_count, 100);
+                is_changed |= ImGui::InputFloat("Noise multiplier", &mult, 0.1, 0.1, "%.1f");
             }
             ImGui::End();
             
