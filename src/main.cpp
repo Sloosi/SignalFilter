@@ -17,16 +17,29 @@ SinParam sin3 = {0, 0, 0};
 int FS = 1'024;
 
 int data_count = 1024;
-float mult = 1.0f;
+float alpha = 1.0f;
 
-double CreateWhiteNoise()
+double CalculateEnergy(const std::vector<double>& data)
 {
-    int i = 0;
-    for (size_t s = 0; s < 12; s++)
+    double energy = 0;
+    for (double s : data)
     {
-        i += rand();
+        energy += (s * s);
     }
-    return (i - static_cast<double>(RAND_MAX / 2)) / RAND_MAX;
+    return energy;
+}
+
+void CreateWhiteNoise(std::vector<double>& data)
+{
+    for (size_t i = 0; i < data.size(); i++)
+    {
+        int noise = 0;
+        for (size_t s = 0; s < 12; s++)
+        {
+            noise += rand();
+        }
+        data[i] = (noise - static_cast<double>(RAND_MAX / 2)) / RAND_MAX;
+    }
 }
 
 static void glfw_error_callback(int error, const char* description)
@@ -34,13 +47,14 @@ static void glfw_error_callback(int error, const char* description)
     std::println(stderr, "GLFW Error %d: %s\n", error, description);
 }
 
-void FillSinData(std::vector<double>& x_data, std::vector<double>& y_data)
+void FillSinData(std::vector<double>& x_data, std::vector<double>& y_data, std::vector<double>& noise)
 {
     float time_step = 1.0f / FS;
     x_data.clear();
     y_data.clear();
     x_data.reserve(data_count);
     y_data.reserve(data_count);
+
     for (int i = 0; i < data_count; i++)
     {
         double sin1_data = sin1.amplitude * sin(2 * PI * sin1.frequency * time_step * i + sin1.phase);
@@ -48,15 +62,27 @@ void FillSinData(std::vector<double>& x_data, std::vector<double>& y_data)
         double sin3_data = sin3.amplitude * sin(2 * PI * sin3.frequency * time_step * i + sin3.phase);
 
         x_data.push_back(time_step * i);
-        y_data.push_back(sin1_data + sin2_data + sin3_data + mult * CreateWhiteNoise());
+        y_data.push_back(sin1_data + sin2_data + sin3_data);
+    }
+
+    double sign_energy = CalculateEnergy(y_data);
+    double noise_energy = CalculateEnergy(noise);
+
+    double beta = sign_energy * alpha /noise_energy;
+
+    for (int i = 0; i < data_count; i++)
+    {
+        noise[i] *= beta;
+        y_data[i] += noise[i];
     }
 }
 
-void CalculateSpectrum(const std::vector<double>& signal, std::vector<double>& ampls, std::vector<double>& freqs)
+void CalculateSpectrum(const std::vector<double>& signal, std::vector<double>& ampls, std::vector<double>& freqs, std::vector<Complex>& spec)
 {
     auto N = signal.size();
 
     auto fft_res = fft_real(signal);
+    spec = fft_res;
     ampls = amplitude_spectrum(fft_res);
     
     freqs.resize(N);
@@ -66,6 +92,27 @@ void CalculateSpectrum(const std::vector<double>& signal, std::vector<double>& a
         freqs[k] = static_cast<float>(k * FS) / N;
     }
 
+}
+
+std::vector<Complex> ClearSpectrum(std::vector<Complex> spec, const std::vector<double>& ampl_data)
+{
+    double sn_energy = CalculateEnergy(ampl_data);
+    double s_energy = sn_energy / (1 + alpha);
+
+    double energy_counter = 0;
+
+    size_t k = 0;
+    for (; k < data_count; k++)
+    {
+        energy_counter += (ampl_data[k] * ampl_data[k]);
+        energy_counter += (ampl_data[data_count - 1 - k] * ampl_data[data_count - 1 - k]);
+        if (energy_counter > s_energy) break;
+    }
+
+    for (size_t i = k + 1; i < data_count - k - 2; i++)
+        spec[i] = 0;
+
+    return spec;
 }
 
 void RenderPlot(const char* title, const char* x_lable, const char* y_lable, const double* x_data, const double* y_data, int count = data_count)
@@ -119,9 +166,14 @@ int main(int, char**)
     /*================================================*/
     ImVec4 clear_color = ImVec4(0.02f, 0.02f, 0.03f, 1.0f);
 
-    std::vector<double> x_data, y_data, ampls, freqs;
-    FillSinData(x_data, y_data);
-    CalculateSpectrum(y_data, ampls, freqs);
+    std::vector<double> x_data, y_data, ampls, freqs, noise_data, clear_ampls;
+    std::vector<Complex>  spec_data, clear_spec;
+    noise_data.resize(data_count);
+    CreateWhiteNoise(noise_data);
+    FillSinData(x_data, y_data, noise_data);
+    CalculateSpectrum(y_data, ampls, freqs, spec_data);
+    clear_spec = ClearSpectrum(spec_data, ampls);
+    clear_ampls = amplitude_spectrum(clear_spec);
     while (!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
@@ -154,14 +206,17 @@ int main(int, char**)
                 ImGui::Text("Other params");
                 is_changed |= ImGui::InputInt("Sample rate", &FS, 100);
                 is_changed |= ImGui::InputInt("Count of points", &data_count, 100);
-                is_changed |= ImGui::InputFloat("Noise multiplier", &mult, 0.1, 0.1, "%.1f");
+                is_changed |= ImGui::InputFloat("Noise multiplier", &alpha, 0.1, 0.1, "%.1f");
             }
             ImGui::End();
             
             if (is_changed)
             {
-                FillSinData(x_data, y_data);
-                CalculateSpectrum(y_data, ampls, freqs);
+                CreateWhiteNoise(noise_data);
+                FillSinData(x_data, y_data, noise_data);
+                CalculateSpectrum(y_data, ampls, freqs, spec_data);
+                clear_spec = ClearSpectrum(spec_data, ampls);
+                clear_ampls = amplitude_spectrum(clear_spec);
             }
 
             ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + 400, viewport->WorkPos.y));
@@ -169,8 +224,12 @@ int main(int, char**)
             RenderPlot("Input signal", "t, sec", "x", x_data.data(), y_data.data());
 
             ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + 400, viewport->WorkPos.y + 0.33 * viewport->WorkSize.y));
-            ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x - 400, viewport->WorkSize.y / 3));
-            RenderPlot("Spectrum signal", "f, Hz", "Ampl", freqs.data(), ampls.data(), freqs.size());
+            ImGui::SetNextWindowSize(ImVec2((viewport->WorkSize.x - 400) / 2, viewport->WorkSize.y / 3));
+            RenderPlot("Spectrum signal (noise)", "f, Hz", "Ampl", freqs.data(), ampls.data(), freqs.size());
+
+            ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + 400 + (viewport->WorkSize.x - 400) / 2, viewport->WorkPos.y + 0.33 * viewport->WorkSize.y));
+            ImGui::SetNextWindowSize(ImVec2((viewport->WorkSize.x - 400) / 2, viewport->WorkSize.y / 3));
+            RenderPlot("Spectrum signal (clear)", "f, Hz", "Ampl", freqs.data(), clear_ampls.data(), freqs.size());
         }
 
         // Rendering

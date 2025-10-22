@@ -97,6 +97,7 @@ std::vector<double> amplitude_spectrum(const std::vector<Complex>& fft_result) {
     for (size_t i = 0; i < fft_result.size(); ++i) {
         spectrum[i] = 2 * std::abs(fft_result[i]) / N;
     }
+    spectrum[0] = 0;
     return spectrum;
 }
 
