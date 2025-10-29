@@ -43,9 +43,21 @@ target_link_libraries(implot PUBLIC imgui)
 
 set(SRC_FILES
     src/main.cpp
-    src/fft.h
-    src/UI/SinController.h
-    src/UI/SinController.cpp
+
+    src/App.h
+    src/App.cpp
+    
+    src/SignalProcessor.h
+    src/SignalProcessor.cpp
+
+    src/SpectrumFilter.h
+    src/SpectrumFilter.cpp
+
+    src/math/fft.h
+    src/math/fft.cpp
+
+    src/UI/SignalUI.h
+    src/UI/SignalUI.cpp
 )
 
 # Создание исполняемого файла

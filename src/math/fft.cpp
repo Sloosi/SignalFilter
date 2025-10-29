@@ -1,17 +1,7 @@
-#pragma once
+#include "fft.h"
 
-#include <iostream>
-#include <vector>
-#include <complex>
-#include <cmath>
-#include <algorithm>
-
-using Complex = std::complex<double>;
-
-const double PI = acos(-1.0);
-
-
-std::vector<Complex> pad_to_power_of_two(const std::vector<Complex>& input) {
+std::vector<Complex> pad_to_power_of_two(const std::vector<Complex>& input)
+{
     size_t n = input.size();
 
     size_t new_size = 1;
@@ -33,7 +23,8 @@ std::vector<Complex> pad_to_power_of_two(const std::vector<Complex>& input) {
     return padded;
 }
 
-std::vector<Complex> fft(const std::vector<Complex>& input) {
+std::vector<Complex> fft(const std::vector<Complex>& input)
+{
     
     auto pad_input = pad_to_power_of_two(input);
 
@@ -65,7 +56,8 @@ std::vector<Complex> fft(const std::vector<Complex>& input) {
     return result;
 }
 
-std::vector<Complex> ifft(const std::vector<Complex>& input) {
+std::vector<Complex> ifft(const std::vector<Complex>& input)
+{
     int n = input.size();
 
     std::vector<Complex> conjugated(n);
@@ -82,7 +74,8 @@ std::vector<Complex> ifft(const std::vector<Complex>& input) {
     return result;
 }
 
-std::vector<Complex> fft_real(const std::vector<double>& real_input) {
+std::vector<Complex> fft_real(const std::vector<double>& real_input)
+{
     std::vector<Complex> complex_input(real_input.size());
     for (size_t i = 0; i < real_input.size(); ++i) {
         complex_input[i] = Complex(real_input[i], 0.0);
@@ -90,7 +83,8 @@ std::vector<Complex> fft_real(const std::vector<double>& real_input) {
     return fft(complex_input);
 }
 
-std::vector<double> amplitude_spectrum(const std::vector<Complex>& fft_result) {
+std::vector<double> amplitude_spectrum(const std::vector<Complex>& fft_result)
+{
     auto N = fft_result.size();
     
     std::vector<double> spectrum(N);
@@ -101,7 +95,8 @@ std::vector<double> amplitude_spectrum(const std::vector<Complex>& fft_result) {
     return spectrum;
 }
 
-std::vector<double> phase_spectrum(const std::vector<Complex>& fft_result) {
+std::vector<double> phase_spectrum(const std::vector<Complex>& fft_result)
+{
     std::vector<double> spectrum(fft_result.size());
     for (size_t i = 0; i < fft_result.size(); ++i)
     {

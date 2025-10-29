@@ -7,17 +7,18 @@
 #include <print>
 #include <vector>
 
-#include "UI/SinController.h"
-#include "fft.h"
+#include "UI/SignalUI.h"
+#include "math/fft.h"
 
-SinParam sin1 = {10, 10, 0};
-SinParam sin2 = {0, 0, 0};
-SinParam sin3 = {0, 0, 0};
+SinParam sin1 = { 10, 10, 0 };
+SinParam sin2 = { 0, 0, 0 };
+SinParam sin3 = { 0, 0, 0 };
 
 int FS = 1'024;
 
 int data_count = 1024;
-float alpha = 1.0f;
+float alpha = 0.2f;
+float gamma = 1.0f;
 
 double CalculateEnergy(const std::vector<double>& data)
 {
@@ -38,7 +39,7 @@ void CreateWhiteNoise(std::vector<double>& data)
         {
             noise += rand();
         }
-        data[i] = (noise - static_cast<double>(RAND_MAX / 2)) / RAND_MAX;
+        data[i] = (noise - static_cast<double>(RAND_MAX * 6)) / (12 * RAND_MAX);
     }
 }
 
@@ -68,7 +69,7 @@ void FillSinData(std::vector<double>& x_data, std::vector<double>& y_data, std::
     double sign_energy = CalculateEnergy(y_data);
     double noise_energy = CalculateEnergy(noise);
 
-    double beta = sign_energy * alpha /noise_energy;
+    double beta = sqrt(sign_energy * alpha / noise_energy);
 
     for (int i = 0; i < data_count; i++)
     {
@@ -84,7 +85,7 @@ void CalculateSpectrum(const std::vector<double>& signal, std::vector<double>& a
     auto fft_res = fft_real(signal);
     spec = fft_res;
     ampls = amplitude_spectrum(fft_res);
-    
+
     freqs.resize(N);
     ampls.resize(N);
     for (int k = 0; k < N; k++)
@@ -97,7 +98,8 @@ void CalculateSpectrum(const std::vector<double>& signal, std::vector<double>& a
 std::vector<Complex> ClearSpectrum(std::vector<Complex> spec, const std::vector<double>& ampl_data)
 {
     double sn_energy = CalculateEnergy(ampl_data);
-    double s_energy = sn_energy / (1 + alpha);
+    double s_energy = sn_energy * (1 / (1 + alpha));
+    //double s_energy = sn_energy * gamma;
 
     double energy_counter = 0;
 
@@ -157,7 +159,7 @@ int main(int, char**)
     ImPlot::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    
+
     ImGui::StyleColorsClassic();
     ImPlot::StyleColorsClassic();
 
@@ -168,12 +170,24 @@ int main(int, char**)
 
     std::vector<double> x_data, y_data, ampls, freqs, noise_data, clear_ampls;
     std::vector<Complex>  spec_data, clear_spec;
+    std::vector<double> clear_signal;
+
     noise_data.resize(data_count);
+    clear_signal.resize(data_count);
     CreateWhiteNoise(noise_data);
     FillSinData(x_data, y_data, noise_data);
     CalculateSpectrum(y_data, ampls, freqs, spec_data);
     clear_spec = ClearSpectrum(spec_data, ampls);
     clear_ampls = amplitude_spectrum(clear_spec);
+
+    auto ifft_res = ifft(clear_spec);
+
+    for (size_t i = 0; i < ifft_res.size(); i++)
+    {
+        auto el = ifft_res[i];
+        clear_signal[i] = el.real();
+    }
+
     while (!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
@@ -184,7 +198,7 @@ int main(int, char**)
 
         ImGuiViewport* viewport = ImGui::GetMainViewport();
 
-        
+
         //Left Panel
         {
             bool is_changed = false;
@@ -206,12 +220,17 @@ int main(int, char**)
                 ImGui::Text("Other params");
                 is_changed |= ImGui::InputInt("Sample rate", &FS, 100);
                 is_changed |= ImGui::InputInt("Count of points", &data_count, 100);
-                is_changed |= ImGui::InputFloat("Noise multiplier", &alpha, 0.1, 0.1, "%.1f");
+                is_changed |= ImGui::InputFloat("Noise multiplier", &alpha, 0.01, 0.1, "%.2f");
+                is_changed |= ImGui::SliderFloat("Gamma", &gamma, 0, 1, "%.2f");
             }
             ImGui::End();
-            
+
             if (is_changed)
             {
+                alpha = alpha < 0 ? 0 : alpha;
+                data_count = data_count < 1024 ? 1024 : data_count;
+                FS = FS < 1 ? 1 : FS;
+
                 CreateWhiteNoise(noise_data);
                 FillSinData(x_data, y_data, noise_data);
                 CalculateSpectrum(y_data, ampls, freqs, spec_data);
@@ -223,13 +242,26 @@ int main(int, char**)
             ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x - 400, viewport->WorkSize.y / 3));
             RenderPlot("Input signal", "t, sec", "x", x_data.data(), y_data.data());
 
-            ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + 400, viewport->WorkPos.y + 0.33 * viewport->WorkSize.y));
+            ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + 400, viewport->WorkPos.y + (1.0 / 3.0) * viewport->WorkSize.y));
             ImGui::SetNextWindowSize(ImVec2((viewport->WorkSize.x - 400) / 2, viewport->WorkSize.y / 3));
             RenderPlot("Spectrum signal (noise)", "f, Hz", "Ampl", freqs.data(), ampls.data(), freqs.size());
 
-            ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + 400 + (viewport->WorkSize.x - 400) / 2, viewport->WorkPos.y + 0.33 * viewport->WorkSize.y));
+            ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + 400 + (viewport->WorkSize.x - 400) / 2, viewport->WorkPos.y + (1.0 / 3.0) * viewport->WorkSize.y));
             ImGui::SetNextWindowSize(ImVec2((viewport->WorkSize.x - 400) / 2, viewport->WorkSize.y / 3));
             RenderPlot("Spectrum signal (clear)", "f, Hz", "Ampl", freqs.data(), clear_ampls.data(), freqs.size());
+
+            ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + 400, viewport->WorkPos.y + (2.0 / 3.0) * viewport->WorkSize.y));
+            ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x - 400, viewport->WorkSize.y / 3));
+            RenderPlot("Clear signal", "t, sec", "x", x_data.data(), clear_signal.data());
+
+            ifft_res = ifft(clear_spec);
+
+            for (size_t i = 0; i < ifft_res.size(); i++)
+            {
+                auto el = ifft_res[i];
+                clear_signal[i] = el.real();
+            }
+
         }
 
         // Rendering
@@ -237,10 +269,10 @@ int main(int, char**)
         int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
-        glClearColor(clear_color.x * clear_color.w, 
-                     clear_color.y * clear_color.w, 
-                     clear_color.z * clear_color.w, 
-                     clear_color.w);
+        glClearColor(clear_color.x * clear_color.w,
+            clear_color.y * clear_color.w,
+            clear_color.z * clear_color.w,
+            clear_color.w);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
