@@ -1,20 +1,19 @@
 #include "SignalProcessor.h"
 #include "SpectrumFilter.h"
 
-void SignalProcessor::Update(const Config& cfg) 
+SignalProcessor::SignalProcessor()
 {
-    if (cfg == m_Config) return;
-    m_Config = cfg;
-
     m_Time.resize(m_Config.pointCount);
     m_InputSignal.resize(m_Config.pointCount);
     m_Noise.resize(m_Config.pointCount);
     m_CleanSignal.resize(m_Config.pointCount);
+    m_IdealSignal.resize(m_Config.pointCount);
 
     GenerateWhiteNoise();
     GenerateSignal();
     ComputeSpectrum();
     FilterSpectrum();
+    CalculateDelta();
 
     // IFFT
     auto ifftRes = ifft(m_FilteredSpectrum);
@@ -22,6 +21,46 @@ void SignalProcessor::Update(const Config& cfg)
     {
         m_CleanSignal[i] = ifftRes[i].real();
     }
+}
+
+void SignalProcessor::Update(const Config& cfg)
+{
+    if (cfg == m_Config) return;
+    if (cfg.pointCount != m_Config.pointCount || cfg.sampleRate != m_Config.sampleRate)
+    {
+        m_Noise.resize(cfg.pointCount);
+        GenerateWhiteNoise();
+    }
+
+    m_Config = cfg;
+
+    m_Time.resize(m_Config.pointCount);
+    m_InputSignal.resize(m_Config.pointCount);
+    m_CleanSignal.resize(m_Config.pointCount);
+    m_IdealSignal.resize(m_Config.pointCount);
+
+    GenerateSignal();
+    ComputeSpectrum();
+    FilterSpectrum();
+    CalculateDelta();
+
+    // IFFT
+    auto ifftRes = ifft(m_FilteredSpectrum);
+    for (size_t i = 0; i < ifftRes.size(); ++i)
+    {
+        m_CleanSignal[i] = ifftRes[i].real();
+    }
+}
+
+void SignalProcessor::CalculateDelta()
+{
+    m_Delta = 0;
+
+    for (size_t i = 0; i < m_Config.pointCount; i++)
+    {
+        m_Delta += (m_CleanSignal[i] - m_IdealSignal[i]) * (m_CleanSignal[i] - m_IdealSignal[i]);
+    }
+    m_Delta /= m_Config.pointCount;
 }
 
 void SignalProcessor::GenerateWhiteNoise()
@@ -51,6 +90,7 @@ void SignalProcessor::GenerateSignal()
 
         m_Time[i] = t;
         m_InputSignal[i] = s1 + s2 + s3;
+        m_IdealSignal[i] = s1 + s2 + s3;
         signalEnergy += m_InputSignal[i] * m_InputSignal[i];
     }
 
@@ -97,6 +137,7 @@ bool operator==(const SinParam &rhs, const SinParam &lhs)
 bool operator==(const SignalProcessor::Config &rhs, const SignalProcessor::Config &lhs)
 {
     return 
+        (rhs.showNoise == lhs.showNoise) &&
         (rhs.sampleRate == lhs.sampleRate) &&
         (rhs.pointCount == lhs.pointCount) &&
         (rhs.noiseAlpha == lhs.noiseAlpha) &&

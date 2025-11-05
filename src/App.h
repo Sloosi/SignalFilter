@@ -17,7 +17,7 @@ public:
     void Run();
 
 private:
-    void RenderUI();
+    void RenderControlPanel();
     void RenderPlots();
 
     GLFWwindow* m_Window;

@@ -46,7 +46,7 @@ void App::Run()
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        RenderUI();
+        RenderControlPanel();
 
         if (m_NeedsUpdate)
         {
@@ -66,7 +66,7 @@ void App::Run()
     }
 }
 
-void App::RenderUI()
+void App::RenderControlPanel()
 {
     ImGuiViewport* viewport = ImGui::GetMainViewport();
 
@@ -77,6 +77,8 @@ void App::RenderUI()
         ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
         ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar))
     {
+        int oldPointCount = m_Config.pointCount;
+
         ImGui::Separator();
         m_NeedsUpdate |= SinController("First harmonic", m_Config.sin1);
         ImGui::Separator();
@@ -87,12 +89,22 @@ void App::RenderUI()
 
         m_NeedsUpdate |= ImGui::InputInt("Sample Rate", &m_Config.sampleRate, 100);
         m_NeedsUpdate |= ImGui::InputInt("Points", &m_Config.pointCount, 100);
+        ImGui::Separator();
         m_NeedsUpdate |= ImGui::SliderFloat("Noise alpha", &m_Config.noiseAlpha, 0.0f, 2.0f, "%.2f");
         m_NeedsUpdate |= ImGui::SliderFloat("Gamma", &m_Config.gamma, 0.0f, 1.0f, "%.2f");
+        m_NeedsUpdate |= ImGui::Checkbox("Show Noise", &m_Config.showNoise);
 
         m_Config.sampleRate = std::max(1, m_Config.sampleRate);
         m_Config.pointCount = std::max(1024, m_Config.pointCount);
         m_Config.noiseAlpha = std::max(0.0f, m_Config.noiseAlpha);
+
+        m_Config.pointCount = (oldPointCount < m_Config.pointCount) ? oldPointCount << 1
+            : (oldPointCount > m_Config.pointCount) ? oldPointCount >> 1
+            : oldPointCount;
+
+        ImGui::Separator();
+
+        ImGui::Text("Delta: %.2f", m_Processor.GetDelta());
 
         ImGui::End();
     }
@@ -104,8 +116,12 @@ void App::RenderPlots()
 
     int timeCount = m_Processor.GetTime().size();
     const double* timeData = m_Processor.GetTime().data();
-    const double* inputSignalData = m_Processor.GetInputSignal().data();
     const double* cleanSignalData = m_Processor.GetCleanSignal().data();
+
+    bool showNoise = m_Processor.IsShowNoise();
+    const double* inputSignalData = showNoise? m_Processor.GetInputSignal().data() :
+                                               m_Processor.GetIdealSignal().data();
+
 
     int frequenciesCount = m_Processor.GetTime().size();
     const double* frequenciesData = m_Processor.GetFrequencies().data();

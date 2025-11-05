@@ -13,7 +13,7 @@ SpectrumFilter::Apply(const std::vector<Complex>& spectrum,
     double accumulated = 0;
     size_t k = 0;
 
-    for (; k < amplitudes.size(); ++k)
+    for (; k < amplitudes.size(); k++)
     {
         accumulated += amplitudes[k] * amplitudes[k];
         accumulated += amplitudes[amplitudes.size() - k - 1] * amplitudes[amplitudes.size() - k - 1];
@@ -21,10 +21,14 @@ SpectrumFilter::Apply(const std::vector<Complex>& spectrum,
         if (accumulated > targetEnergy) break;
     }
 
+    if (k == 1024) return filtered;
     for (size_t i = k + 1; i < amplitudes.size() - k - 1; ++i)
     {
         filtered[i] = 0;
     }
+
+    filtered[0] = 0;
+    filtered[amplitudes.size() - 1] = 0;
 
     return filtered;
 }
