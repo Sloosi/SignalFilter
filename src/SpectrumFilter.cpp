@@ -22,13 +22,10 @@ SpectrumFilter::Apply(const std::vector<Complex>& spectrum,
     }
 
     if (k == 1024) return filtered;
-    for (size_t i = k + 1; i < amplitudes.size() - k - 1; ++i)
+    for (size_t i = k; i < amplitudes.size() - k; ++i)
     {
         filtered[i] = 0;
     }
-
-    filtered[0] = 0;
-    filtered[amplitudes.size() - 1] = 0;
 
     return filtered;
 }

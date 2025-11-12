@@ -13,7 +13,6 @@ SignalProcessor::SignalProcessor()
     GenerateSignal();
     ComputeSpectrum();
     FilterSpectrum();
-    CalculateDelta();
 
     // IFFT
     auto ifftRes = ifft(m_FilteredSpectrum);
@@ -21,6 +20,8 @@ SignalProcessor::SignalProcessor()
     {
         m_CleanSignal[i] = ifftRes[i].real();
     }
+
+    CalculateDelta();
 }
 
 void SignalProcessor::Update(const Config& cfg)
@@ -42,7 +43,6 @@ void SignalProcessor::Update(const Config& cfg)
     GenerateSignal();
     ComputeSpectrum();
     FilterSpectrum();
-    CalculateDelta();
 
     // IFFT
     auto ifftRes = ifft(m_FilteredSpectrum);
@@ -50,17 +50,22 @@ void SignalProcessor::Update(const Config& cfg)
     {
         m_CleanSignal[i] = ifftRes[i].real();
     }
+
+    CalculateDelta();
 }
 
 void SignalProcessor::CalculateDelta()
 {
     m_Delta = 0;
 
+    double counter = 0.0;
+
     for (size_t i = 0; i < m_Config.pointCount; i++)
     {
         m_Delta += (m_CleanSignal[i] - m_IdealSignal[i]) * (m_CleanSignal[i] - m_IdealSignal[i]);
+        counter += m_IdealSignal[i] * m_IdealSignal[i];
     }
-    m_Delta /= m_Config.pointCount;
+    m_Delta /= counter;
 }
 
 void SignalProcessor::GenerateWhiteNoise()

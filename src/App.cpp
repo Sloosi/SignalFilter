@@ -90,11 +90,13 @@ void App::RenderControlPanel()
         m_NeedsUpdate |= ImGui::InputInt("Sample Rate", &m_Config.sampleRate, 100);
         m_NeedsUpdate |= ImGui::InputInt("Points", &m_Config.pointCount, 100);
         ImGui::Separator();
-        m_NeedsUpdate |= ImGui::SliderFloat("Noise alpha", &m_Config.noiseAlpha, 0.0f, 2.0f, "%.2f");
-        m_NeedsUpdate |= ImGui::SliderFloat("Gamma", &m_Config.gamma, 0.0f, 1.0f, "%.2f");
+        m_NeedsUpdate |= ImGui::InputFloat("Noise alpha", &m_Config.noiseAlpha, 0.01f, 0.01f, "%.2f");
+        m_NeedsUpdate |= ImGui::InputFloat("Gamma", &m_Config.gamma, 0.01f, 0.01f, "%.2f");
         m_NeedsUpdate |= ImGui::Checkbox("Show Noise", &m_Config.showNoise);
 
         m_Config.sampleRate = std::max(1, m_Config.sampleRate);
+        m_Config.gamma = std::min(1.0f, m_Config.gamma);
+        if (m_Config.gamma < 0.0f) m_Config.gamma = 0.0f;
         m_Config.pointCount = std::max(1024, m_Config.pointCount);
         m_Config.noiseAlpha = std::max(0.0f, m_Config.noiseAlpha);
 
